@@ -2173,7 +2173,7 @@ function mfDefaultSharedData(){
     mf_settings_collapsed:{},
     mf_delete_keyword:'ВИДАЛИТИ',
     mf_patient_notes:{},
-    mf_draft_consultations:{},
+    mf_draft_consultations:[],
     mf_weekly_work_schedules:{},
     mf_patient_events:[]
   };
@@ -2366,6 +2366,96 @@ bind=function(){
   __bindApproval();
   document.querySelectorAll('[data-approve-user]').forEach(el=>el.onclick=()=>approveAuthUser(el.dataset.approveUser));
   document.querySelectorAll('[data-reject-user]').forEach(el=>el.onclick=()=>rejectAuthUser(el.dataset.rejectUser));
+};
+
+
+
+/* === v3_approved hotfix: normalize Firebase data shapes ===
+   Fixes: draftConsultations.filter is not a function when Firebase stored mf_draft_consultations as object/null.
+*/
+function mfAsArray(value){
+  if(Array.isArray(value)) return value;
+  if(value && typeof value === 'object') return Object.values(value).filter(v => v !== null && v !== undefined);
+  return [];
+}
+function mfAsObject(value){
+  return (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+}
+function mfAsBool(value, fallback=false){
+  return typeof value === 'boolean' ? value : fallback;
+}
+function mfNormalizeSharedData(data){
+  data = data || {};
+  return {
+    mf_specialists: mfAsArray(data.mf_specialists).length ? mfAsArray(data.mf_specialists) : [...DEFAULT_SPECIALISTS],
+    mf_doctors: mfAsArray(data.mf_doctors),
+    mf_patients: mfAsArray(data.mf_patients),
+    mf_consultations: mfAsArray(data.mf_consultations),
+    mf_delete_requests: mfAsArray(data.mf_delete_requests),
+    mf_appointments: mfAsArray(data.mf_appointments),
+    mf_appointment_alerts: mfAsArray(data.mf_appointment_alerts),
+    mf_work_schedules: mfAsObject(data.mf_work_schedules),
+    mf_fields: mfAsArray(data.mf_fields).length ? mfAsArray(data.mf_fields) : cloneFields(DEFAULT_FIELDS),
+    mf_doctor_fields: mfAsObject(data.mf_doctor_fields),
+    mf_field_templates: mfAsObject(data.mf_field_templates),
+    mf_settings_collapsed: mfAsObject(data.mf_settings_collapsed),
+    mf_delete_keyword: typeof data.mf_delete_keyword === 'string' ? data.mf_delete_keyword : 'ВИДАЛИТИ',
+    mf_patient_notes: mfAsObject(data.mf_patient_notes),
+    mf_draft_consultations: mfAsArray(data.mf_draft_consultations),
+    mf_weekly_work_schedules: mfAsObject(data.mf_weekly_work_schedules),
+    mf_side_delete_enabled: mfAsBool(data.mf_side_delete_enabled, false),
+    mf_viewed_consult_datetime: mfAsObject(data.mf_viewed_consult_datetime),
+    mf_patient_events: mfAsArray(data.mf_patient_events)
+  };
+}
+mfDefaultSharedData=function(){
+  return mfNormalizeSharedData({});
+};
+mfApplyCloudData=function(data){
+  window.MED_APPLYING_CLOUD=true;
+  const normalized = mfNormalizeSharedData(data || {});
+  specialists = normalized.mf_specialists;
+  doctors = normalized.mf_doctors;
+  patients = normalized.mf_patients;
+  consultations = normalized.mf_consultations;
+  deleteRequests = normalized.mf_delete_requests;
+  appointments = normalized.mf_appointments;
+  appointmentAlerts = normalized.mf_appointment_alerts;
+  workSchedules = normalized.mf_work_schedules;
+  consultationFields = normalized.mf_fields;
+  doctorFields = normalized.mf_doctor_fields;
+  fieldTemplates = normalized.mf_field_templates;
+  settingsCollapsed = normalized.mf_settings_collapsed;
+  deleteKeyword = normalized.mf_delete_keyword;
+  if(typeof patientNotes !== 'undefined') patientNotes = normalized.mf_patient_notes;
+  if(typeof draftConsultations !== 'undefined') draftConsultations = normalized.mf_draft_consultations;
+  if(typeof weeklyWorkSchedules !== 'undefined') weeklyWorkSchedules = normalized.mf_weekly_work_schedules;
+  if(typeof sideDeleteEnabled !== 'undefined') sideDeleteEnabled = normalized.mf_side_delete_enabled;
+  if(typeof viewedConsultDateTime !== 'undefined') viewedConsultDateTime = normalized.mf_viewed_consult_datetime;
+  if(typeof patientEvents !== 'undefined') patientEvents = normalized.mf_patient_events;
+  Object.keys(normalized).forEach(k=>{try{localStorage.setItem(k,JSON.stringify(normalized[k]))}catch(e){}});
+  window.MED_APPLYING_CLOUD=false;
+};
+mfEnsureSharedData=async function(){
+  const ref=mfDb.ref(MF_SHARED_PATH);
+  const snap=await ref.get();
+  const raw=snap.exists() ? (snap.val() || {}) : {};
+  const normalized=mfNormalizeSharedData(raw);
+  if(!snap.exists()){
+    if(Array.isArray(doctors)&&doctors.length) normalized.mf_doctors=doctors;
+    await ref.set(normalized);
+  }else{
+    const updates={};
+    Object.keys(normalized).forEach(k=>{
+      const oldVal=raw[k];
+      const newVal=normalized[k];
+      const oldType=Array.isArray(oldVal)?'array':(oldVal===null?'null':typeof oldVal);
+      const newType=Array.isArray(newVal)?'array':(newVal===null?'null':typeof newVal);
+      if(oldVal===undefined || oldType!==newType) updates[k]=newVal;
+    });
+    if(Object.keys(updates).length) await ref.update(updates);
+  }
+  mfApplyCloudData(normalized);
 };
 
 
