@@ -1,0 +1,337 @@
+<!DOCTYPE html><html lang="uk"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Activity Calendar CRM v3 (Firebase)</title>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#69758a;--border:#dce3ef;--primary:#2563eb;--danger:#dc2626;--success:#16a34a;--warning:#ea580c;--shadow:0 10px 30px rgba(15,23,42,.08)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}button,input,textarea,select{font:inherit}button{border:0;border-radius:12px;padding:10px 14px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}button:hover{filter:brightness(.95)}button.secondary{background:#e8eef8;color:#1f2a44}button.danger{background:var(--danger)}button.small{padding:7px 10px;font-size:13px}input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);outline:0}input[type=color]{height:46px;padding:4px;cursor:pointer}.hidden{display:none!important}.auth{min-height:100vh;display:grid;place-items:center;padding:20px}.card,.panel{background:#fff;border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}.auth .card{width:min(460px,100%);padding:28px}.tabs,.switch{display:grid;grid-template-columns:1fr 1fr;gap:7px;background:#eef3fb;border-radius:14px;padding:6px;margin:16px 0}.tabs button,.switch button{background:transparent;color:var(--muted)}.tabs button.active,.switch button.active{background:#fff;color:var(--text);box-shadow:0 6px 14px rgba(15,23,42,.08)}.field{margin-bottom:13px}.field label{display:block;margin-bottom:6px;color:#344054;font-size:14px;font-weight:700}.hint{color:var(--muted);font-size:13px;line-height:1.45}.msg{margin:10px 0;padding:10px 12px;border-radius:12px;background:#eff6ff;color:#1d4ed8}.msg.err{background:#fef2f2;color:#b91c1c}.top{min-height:70px;background:#fff;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 22px;position:sticky;top:0;z-index:20}.brand strong{font-size:19px}.brand span{display:block;color:var(--muted);font-size:13px}.actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.layout{display:grid;grid-template-columns:320px 1fr;gap:18px;padding:18px}.side{padding:16px;height:calc(100vh - 106px);position:sticky;top:88px;overflow:auto}.sideHead,.calHead,.modalHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.sideHead{align-items:center;margin-bottom:12px}h1,h2,h3{margin-top:0}.list{display:flex;flex-direction:column;gap:10px}.item,.entry{border:1px solid var(--border);border-radius:15px;padding:12px;background:#fbfdff}.row{display:flex;gap:9px;justify-content:space-between;align-items:flex-start}.dot{width:14px;height:14px;border-radius999px;border:1px solid rgba(0,0,0,.14);flex:0 0 auto;margin-top:2px}.muted{color:var(--muted);font-size:13px;line-height:1.35;white-space:pre-wrap}.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}.chip{font-size:12px;background:#eef3fb;color:#344054;border-radius:999px;padding:4px 8px}.filter{display:flex;gap:8px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:13px}.filter input,.inline-check input{width:17px;height:17px;cursor:pointer}.inline-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-top:4px}.empty{color:var(--muted);padding:14px;border:1px dashed var(--border);border-radius:14px;background:#fbfdff}.main{display:flex;flex-direction:column;gap:18px}.main .panel{padding:18px}.calHead{align-items:center;margin-bottom:16px}.calTitle{text-align:center}.calTitle h2{font-size:25px;margin:0}.calTitle span{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.weekday{text-align:center;color:var(--muted);font-size:13px;font-weight:800}.day{min-height:112px;border:1px solid var(--border);border-radius:15px;background:#fff;color:var(--text)!important;padding:9px;display:flex;flex-direction:column;justify-content:space-between;text-align:left}.day:hover{border-color:var(--primary);background:#fff;color:var(--text)!important;box-shadow:0 8px 18px rgba(15,23,42,.08)}.day.other{opacity:.42;background:#f8fafc}.day.today{border:2px solid var(--primary)}.num{font-weight:900;color:#172033!important}.bars{display:flex;height:8px;border-radius:999px;overflow:hidden;background:#edf2f7;margin-bottom:4px}.bars span{flex:1}.mini{font-size:11px;color:#fff;border-radius:7px;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;font-weight:600}.mini.done{background:var(--success)}.mini.pending{background:var(--warning)}.modalBg{position:fixed;inset:0;background:rgba(15,23,42,.48);display:grid;place-items:center;z-index:50;padding:18px}.modal{width:min(820px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:24px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.24)}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.full{grid-column:1/-1}.modalActions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap}.dateGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;border:1px solid var(--border);border-radius:14px;padding:8px;background:#f8fafc}.dateBtn{padding:8px 4px;border:1px solid var(--border);background:#fff;color:#344054}.dateBtn.sel{background:var(--primary);color:#fff}.selDate{border:1px solid var(--border);border-radius:14px;padding:10px;background:#fbfdff;margin-top:9px}.tableWrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--border)}th{background:#f8fafc}.badge{padding:5px 9px;border-radius:999px;background:#eef3fb;font-size:12px;font-weight:800}.badge.admin{background:#dbeafe;color:#1d4ed8}.timelineRel{margin-top:4px;font-size:13px;color:var(--primary);font-weight:800}.entryAct{display:inline-flex;gap:6px;align-items:center;color:#344054;font-size:13px;background:#eef3fb;padding:4px 8px;border-radius:999px;margin-top:4px}textarea{resize:none;overflow:hidden;min-height:46px;line-height:1.5}.user-select-block{display:inline-flex;align-items:center;gap:8px;font-size:14px;background:#f0f4f8;padding:6px 12px;border-radius:10px}.user-select-block select{width:auto;padding:4px 8px;border-radius:6px;height:32px;background:#fff}@media(max-width:940px){.layout{grid-template-columns:1fr}.side{height:auto;position:static}.formGrid{grid-template-columns:1fr}.day{min-height:92px}}@media(max-width:620px){.top,.calHead{flex-direction:column;align-items:stretch}.layout{padding:10px}.day{min-height:78px} .mini{display:none}.modal{padding:16px}}
+</style></head><body>
+<div id="auth" class="auth"><div class="card"><h1>Activity Calendar CRM</h1><p class="hint">Користувачі, календар, активності й таймлайн.</p><div class="tabs"><button id="loginTab" class="active" onclick="authMode('login')">Вхід</button><button id="regTab" onclick="authMode('reg')">Реєстрація</button></div><div id="authMsg"></div><form id="loginForm" onsubmit="login(event)"><div class="field"><label>Логін</label><input id="loginU" value="admin" required></div><div class="field"><label>Пароль</label><input id="loginP" type="password" value="admin123" required></div><button style="width:100%">Увійти</button><p class="hint">Стартовий адмін: <b>admin</b> / <b>admin123</b></p></form><form id="regForm" class="hidden" onsubmit="register(event)"><div class="field"><label>Ім'я</label><input id="regName" required></div><div class="field"><label>Логін</label><input id="regU" required></div><div class="field"><label>Пароль</label><input id="regP" type="password" required></div><button style="width:100%">Зареєструватися</button></form></div></div>
+<div id="app" class="hidden"><header class="top"><div class="brand"><strong>Activity Calendar CRM</strong><span id="userLbl"></span></div><div class="actions"><div id="adminUserSelectBlock" class="user-select-block hidden"><label style="font-weight:700">Календар користувача:</label><select id="adminUserSelector" onchange="switchTargetUser()"></select></div><button id="adminBtn" class="secondary hidden" onclick="toggleAdmin()">Користувачі</button><button class="secondary" onclick="exportData()">Експорт</button><button class="secondary" onclick="document.getElementById('imp').click()">Імпорт</button><input id="imp" class="hidden" type="file" accept=".json" onchange="importData(event)"><button class="danger" onclick="logout()">Вийти</button></div></header><main class="layout"><aside class="panel side"><div class="switch"><button id="actTab" class="active" onclick="sideMode('act')">Активності</button><button id="timeTab" onclick="sideMode('time')">Таймлайн</button></div><section id="actSide"><div class="sideHead"><h2>Активності</h2><button class="small" onclick="openActivity()">+ Додати</button></div><div id="actList" class="list"></div></section><section id="timeSide" class="hidden"><div class="sideHead"><h2>Таймлайн</h2><button class="small secondary" onclick="renderTimeline()">Оновити</button></div><div id="timeline" class="list"></div></section></aside><section class="main"><div id="calPanel" class="panel"><div class="calHead"><button class="secondary" onclick="month(-1)">← Попередній місяць</button><div class="calTitle"><h2 id="monthTitle"></h2><span>Натисніть на день, щоб відкрити записи й активності</span></div><button class="secondary" onclick="month(1)">Наступний місяць →</button></div><div id="week" class="grid"></div><div id="cal" class="grid"></div></div><div id="adminPanel" class="panel hidden"><div class="calHead"><div><h2>Користувачі</h2><p class="hint">Адмін може додавати, редагувати й видаляти користувачів.</p></div><button onclick="openUser()">+ Додати користувача</button></div><div class="tableWrap"><table><thead><tr><th>Ім'я</th><th>Логін</th><th>Роль</th><th>Створено</th><th>Дії</th></tr></thead><tbody id="users"></tbody></table></div></div></section></main></div><div id="modalRoot"></div>
+
+<script>
+// ВСТАВТЕ ВАШ ОБ'ЄКТ CONFIG СЮДИ СЛІДОМ ЗА ЦИМ ШАБЛОНОМ:
+const firebaseConfig = {
+  apiKey: "AIzaSyDleTC1W6c8R-LtVxSlKqSlMBKLzjaecbU",
+  authDomain: "activity-calendar-crm.firebaseapp.com",
+  databaseURL: "https://activity-calendar-crm-default-rtdb.firebaseio.com",
+  projectId: "activity-calendar-crm",
+  storageBucket: "activity-calendar-crm.firebasestorage.app",
+  messagingSenderId: "836899286716",
+  appId: "1:836899286716:web:691cf46fc032beb9796ab9"
+};
+
+// Ініціалізація Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const S={user:null,targetUserId:null,date:new Date(),admin:false,editMonth:new Date(),draft:{},draftStatuses:{},data:{users:[],activities:[],notes:[],hiddenActivityIds:[]}};
+const M=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'],W=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+function key(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function parse(k){let [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d)}
+function fmt(k){let [y,m,d]=k.split('-');return `${d}.${m}.${y}`}
+function esc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}
+function autoExpand(el){el.style.height='auto';el.style.height=el.scrollHeight+'px'}
+
+// Хмарне збереження даних
+function save(){
+  db.ref('crm_data').set(S.data);
+}
+
+// Завантаження та прослуховування хмари в реальному часі
+function load(){
+  db.ref('crm_data').on('value', (snapshot) => {
+    let cloudData = snapshot.val();
+    if (cloudData) {
+      S.data = cloudData;
+    }
+    
+    // Структуризація та міграція даних за умовчанням
+    S.data.users = S.data.users || [];
+    S.data.activities = S.data.activities || [];
+    S.data.notes = S.data.notes || [];
+    S.data.hiddenActivityIds = S.data.hiddenActivityIds || [];
+    
+    if(!S.data.users.length) {
+      S.data.users=[{id:'u1',name:'Адміністратор',username:'admin',password:'admin123',role:'admin',createdAt:new Date().toISOString()}];
+      db.ref('crm_data/users').set(S.data.users);
+    }
+    
+    S.data.activities.forEach(a=>{
+      if(!a.userId) a.userId='u1';
+      if(!a.schedules) a.schedules={};
+      if(!a.statuses) a.statuses={};
+      if(!a.color) a.color='#2563eb';
+    });
+
+    // Якщо сесія активна, оновлюємо екран
+    if (S.user) {
+      // Оновлюємо посилання на об'єкт користувача у випадку його редагування адміном
+      let freshUser = S.data.users.find(x => x.id === S.user.id);
+      if (freshUser) S.user = freshUser;
+      renderAll();
+    }
+  });
+}
+
+function authMode(m){let l=m==='login';loginForm.classList.toggle('hidden',!l);regForm.classList.toggle('hidden',l);loginTab.classList.toggle('active',l);regTab.classList.toggle('active',!l);authMsg.innerHTML=''}
+function msg(t,e=false){authMsg.innerHTML=t?`<div class="msg ${e?'err':''}">${t}</div>`:''}
+
+function login(ev){
+  ev.preventDefault();
+  let u=loginU.value.trim(),p=loginP.value;
+  let user=S.data.users.find(x=>x.username===u&&x.password===p);
+  if(!user) return msg('Невірний логін або пароль.',true);
+  S.user=user;
+  S.targetUserId=user.id;
+  enter();
+}
+
+function register(ev){
+  ev.preventDefault();
+  let name=regName.value.trim(),u=regU.value.trim(),p=regP.value;
+  if(p.length<4)return msg('Пароль має бути мінімум 4 символи.',true);
+  if(S.data.users.some(x=>x.username.toLowerCase()===u.toLowerCase()))return msg('Такий логін вже існує.',true);
+  let user={id:id(),name,username:u,password:p,role:'user',createdAt:new Date().toISOString()};
+  S.data.users.push(user);
+  save();
+  S.user=user;
+  S.targetUserId=user.id;
+  enter();
+}
+
+function enter(){
+  auth.classList.add('hidden');
+  app.classList.remove('hidden');
+  userLbl.textContent=`${S.user.name} · ${S.user.role==='admin'?'адмін':'користувач'}`;
+  if(S.user.role==='admin'){
+    adminBtn.classList.remove('hidden');
+    adminUserSelectBlock.classList.remove('hidden');
+    buildUserSelector();
+  }else{
+    adminBtn.classList.add('hidden');
+    adminUserSelectBlock.classList.add('hidden');
+  }
+  renderAll();
+}
+
+function buildUserSelector(){
+  adminUserSelector.innerHTML=S.data.users.map(u=>`<option value="${u.id}" ${u.id===S.targetUserId?'selected':''}>${esc(u.name)} (${esc(u.username)})</option>`).join('');
+}
+
+function switchTargetUser(){
+  S.targetUserId=adminUserSelector.value;
+  renderAll();
+}
+
+function logout(){
+  S.user=null; S.targetUserId=null;
+  app.classList.add('hidden');
+  auth.classList.remove('hidden');
+  adminPanel.classList.add('hidden');
+  calPanel.classList.remove('hidden');
+  authMode('login');
+}
+
+function renderAll(){
+  renderCal();
+  renderActs();
+  renderTimeline();
+  renderUsers();
+}
+
+function month(n){S.date=new Date(S.date.getFullYear(),S.date.getMonth()+n,1);renderCal()}
+function visible(id){return !S.data.hiddenActivityIds.includes(id)}
+function setVisible(aid,on){S.data.hiddenActivityIds=on?S.data.hiddenActivityIds.filter(x=>x!==aid):[...new Set([...S.data.hiddenActivityIds,aid])];save();renderAll()}
+function actsFor(k,vis=false){return S.data.activities.filter(a=>a.userId===S.targetUserId&&a.schedules&&Object.hasOwn(a.schedules,k)&&(!vis||visible(a.id)))}
+
+function renderCal(){
+  let y=S.date.getFullYear(),m=S.date.getMonth();
+  monthTitle.textContent=`${M[m]} ${y}`;
+  week.innerHTML=W.map(w=>`<div class="weekday">${w}</div>`).join('');
+  cal.innerHTML='';
+  let first=new Date(y,m,1),off=(first.getDay()+6)%7,start=new Date(y,m,1-off),today=key(new Date());
+  for(let i=0;i<42;i++){
+    let d=new Date(start);
+    d.setDate(start.getDate()+i);
+    let k=key(d),aa=actsFor(k,true),notes=S.data.notes.filter(n=>n.date===k&&n.createdBy===S.targetUserId);
+    let bars=aa.length?`<div class="bars">${aa.map(a=>`<span style="background:${a.color}"></span>`).join('')}</div>`:'';
+    let mini=aa.slice(0,3).map(a=>{
+      let isDone=(a.statuses&&a.statuses[k]===true);
+      return `<div class="mini ${isDone?'done':'pending'}" style="border-left: 4px solid ${a.color}">${esc(a.name)}</div>`
+    }).join('');
+    let b=document.createElement('button');
+    b.type='button';
+    b.className=`day ${d.getMonth()!==m?'other':''} ${k===today?'today':''}`;
+    b.innerHTML=`<div class="num">${d.getDate()}</div><div>${bars}${mini}${aa.length>3?`<div class="mini" style="color:var(--text);background:#eee">+ ще ${aa.length-3}</div>`:''}${notes.length?`<div class="mini" style="color:var(--text);background:#eef3fb">📝 Записів: ${notes.length}</div>`:''}</div>`;
+    b.onclick=()=>openDay(k);
+    cal.appendChild(b);
+  }
+}
+
+function renderActs(){
+  let myActs=S.data.activities.filter(a=>a.userId===S.targetUserId);
+  if(!myActs.length){actList.innerHTML='<div class="empty">Активностей ще немає.</div>';return}
+  actList.innerHTML=myActs.map(a=>{
+    let ds=Object.keys(a.schedules||{}).sort();
+    return `<div class="item"><div class="row"><div style="display:flex;gap:9px"><span class="dot" style="background:${a.color}"></span><div><b>${esc(a.name)}</b><div class="muted">${esc(a.description||'Загального опису немає')}</div></div></div><div><button class="small secondary" onclick="openActivity('${a.id}')">Ред.</button> <button class="small danger" onclick="delActivity('${a.id}')">×</button></div></div><label class="filter"><input type="checkbox" ${visible(a.id)?'checked':''} onchange="setVisible('${a.id}',this.checked)"> Показувати в календарі</label><div class="chips">${ds.slice(0,8).map(d=>`<span class="chip">${fmt(d)}</span>`).join('')}${ds.length>8?`<span class="chip">+ ще ${ds.length-8}</span>`:''}</div></div>`
+  }).join('');
+}
+
+function sideMode(m){actSide.classList.toggle('hidden',m!=='act');timeSide.classList.toggle('hidden',m!=='time');actTab.classList.toggle('active',m==='act');timeTab.classList.toggle('active',m==='time');if(m==='time')renderTimeline()}
+
+function renderTimeline(){
+  let box=document.getElementById('timeline');
+  if(!box)return;
+  let t=new Date(),today=new Date(t.getFullYear(),t.getMonth(),t.getDate()),tk=key(today),items=[];
+  let myActs=S.data.activities.filter(a=>a.userId===S.targetUserId);
+  myActs.forEach(a=>{
+    if(!visible(a.id))return;
+    Object.keys(a.schedules||{}).forEach(d=>{
+      if(d>=tk)items.push({a,k:d,date:parse(d),desc:a.schedules[d]||a.description||'',done:a.statuses&&a.statuses[d]===true})
+    })
+  });
+  items.sort((x,y)=>x.date-y.date);
+  if(!items.length){box.innerHTML='<div class="empty">Найближчих активностей немає або вони приховані.</div>';return}
+  box.innerHTML=items.slice(0,30).map(it=>{
+    let diff=Math.round((it.date-today)/86400000),rel=diff===0?'сьогодні':diff===1?'завтра':`через ${diff} днів`;
+    return `<div class="item" style="border-left: 5px solid ${it.done?'var(--success)':'var(--warning)'}"><div style="display:flex;gap:8px;justify-content:space-between"><span><span class="dot" style="background:${it.a.color}"></span><b>${fmt(it.k)} — ${esc(it.a.name)}</b></span><span class="badge ${it.done?'admin':''}" style="background:${it.done?'#dcfce7':'#ffedd5'};color:${it.done?'#15803d':'#c2410c'}">${it.done?'Виконано':'Не зроблено'}</span></div><div class="timelineRel">(${rel})</div><div class="muted">${esc(it.desc||'Опису для цієї дати немає')}</div><div class="chips"><button class="small secondary" onclick="openActivity('${it.a.id}','${it.k}')">Редагувати</button><button class="small secondary" onclick="openDay('${it.k}')">Відкрити день</button></div></div>`
+  }).join('');
+}
+
+function toggleAdmin(){S.admin=!S.admin;adminPanel.classList.toggle('hidden',!S.admin);calPanel.classList.toggle('hidden',S.admin)}
+
+function renderUsers(){
+  users.innerHTML=S.data.users.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td><span class="badge ${u.role==='admin'?'admin':''}">${u.role==='admin'?'Адмін':'Користувач'}</span></td><td>${new Date(u.createdAt).toLocaleDateString('uk-UA')}</td><td><button class="small secondary" onclick="openUser('${u.id}')">Ред.</button> <button class="small danger" ${u.id===S.user?.id?'disabled':''} onclick="delUser('${u.id}')">×</button></td></tr>`).join('');
+}
+
+function openUser(uid=''){
+  if(S.user.role!=='admin')return;
+  let u=S.data.users.find(x=>x.id===uid);
+  modal(`<div class="modalHead"><h2>${u?'Редагувати':'Додати'} користувача</h2><button class="small secondary" onclick="closeModal()">Закрити</button></div><form onsubmit="saveUser(event,'${uid}')"><div class="formGrid"><div class="field"><label>Ім'я</label><input id="uName" value="${esc(u?.name||'')}" required></div><div class="field"><label>Логін</label><input id="uLogin" value="${esc(u?.username||'')}" required></div><div class="field"><label>Пароль</label><input id="uPass" value="${esc(u?.password||'')}" required></div><div class="field"><label>Роль</label><select id="uRole"><option value="user" ${u?.role==='user'?'selected':''}>Користувач</option><option value="admin" ${u?.role==='admin'?'selected':''}>Адмін</option></select></div></div><div class="modalActions"><button class="secondary" type="button" onclick="closeModal()">Скасувати</button><button>Зберегти</button></div></form>`);
+}
+
+function saveUser(ev,uid){
+  ev.preventDefault();
+  let name=uName.value.trim(),username=uLogin.value.trim(),password=uPass.value,role=uRole.value;
+  if(password.length<4)return alert('Пароль має бути мінімум 4 символи.');
+  if(S.data.users.some(x=>x.username.toLowerCase()===username.toLowerCase()&&x.id!==uid))return alert('Такий логін вже існує.');
+  if(uid){
+    let u=S.data.users.find(x=>x.id===uid);
+    Object.assign(u,{name,username,password,role});
+  }else {
+    S.data.users.push({id:id(),name,username,password,role,createdAt:new Date().toISOString()});
+  }
+  save();
+  closeModal();
+  renderUsers();
+  buildUserSelector();
+}
+
+function delUser(uid){
+  if(uid===S.user.id)return alert('Не можна видалити себе.');
+  if(confirm('Видалити користувача? Його активності залишаться.')){
+    S.data.users=S.data.users.filter(x=>x.id!==uid);
+    save();
+    renderUsers();
+    buildUserSelector();
+  }
+}
+
+function openActivity(aid='',focus=''){
+  let a=S.data.activities.find(x=>x.id===aid);
+  S.draft=JSON.parse(JSON.stringify(a?.schedules||{}));
+  S.draftStatuses=JSON.parse(JSON.stringify(a?.statuses||{}));
+  S.editMonth=focus?parse(focus):new Date(S.date.getFullYear(),S.date.getMonth(),1);
+  modal(`<div class="modalHead"><div><h2>${a?'Редагувати':'Додати'} активність</h2><p class="hint">Можна перемикати місяці й вибирати дати в різних місяцях.</p></div><button class="small secondary" onclick="closeModal()">Закрити</button></div><form onsubmit="saveActivity(event,'${aid}')"><div class="formGrid"><div class="field"><label>Назва</label><input id="aName" value="${esc(a?.name||'')}" required></div><div class="field"><label>Колір</label><input id="aColor" type="color" value="${esc(a?.color||'#2563eb')}"></div><div class="field full"><label>Загальний опис</label><textarea id="aDesc" oninput="autoExpand(this)">${esc(a?.description||'')}</textarea></div><div class="field full"><label>Дні активності</label><div id="datePick"></div></div><div class="field full"><label>Налаштування для конкретних дат</label><div id="dateDescs"></div></div></div><div class="modalActions"><button type="button" class="secondary" onclick="closeModal()">Скасувати</button><button>Зберегти</button></div></form>`);
+  autoExpand(document.getElementById('aDesc'));
+  renderDatePick();
+  renderDateDescs();
+}
+
+function renderDatePick(){
+  let y=S.editMonth.getFullYear(),m=S.editMonth.getMonth(),days=new Date(y,m+1,0).getDate(),first=new Date(y,m,1),off=(first.getDay()+6)%7;
+  datePick.innerHTML=`<div class="sideHead"><button type="button" class="small secondary" onclick="editMonth(-1)">← Попередній</button><b>${M[m]} ${y}</b><button type="button" class="small secondary" onclick="editMonth(1)">Наступний →</button></div><div class="grid">${W.map(w=>`<div class="weekday">${w}</div>`).join('')}</div><div class="dateGrid">${'<div></div>'.repeat(off)}${Array.from({length:days},(_,i)=>{let k=key(new Date(y,m,i+1));return `<button type="button" class="dateBtn ${Object.hasOwn(S.draft,k)?'sel':''}" onclick="toggleDate('${k}')">${i+1}</button>`}).join('')}</div>`
+}
+
+function editMonth(n){collectDateTexts();S.editMonth=new Date(S.editMonth.getFullYear(),S.editMonth.getMonth()+n,1);renderDatePick();renderDateDescs()}
+function toggleDate(k){collectDateTexts();if(Object.hasOwn(S.draft,k)){delete S.draft[k];if(S.draftStatuses[k]!==undefined)delete S.draftStatuses[k]}else{S.draft[k]='';S.draftStatuses[k]=false}renderDatePick();renderDateDescs()}
+
+function renderDateDescs(){
+  let ds=Object.keys(S.draft).sort();
+  dateDescs.innerHTML=ds.length?ds.map(d=>`<div class="selDate"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>${fmt(d)}</b><label class="inline-check"><input type="checkbox" data-status-d="${d}" ${S.draftStatuses[d]?'checked':''}> Виконано</label></div><textarea data-dd="${d}" placeholder="Опис саме для цієї дати" oninput="autoExpand(this)">${esc(S.draft[d]||'')}</textarea></div>`).join(''):'<div class="empty">Поки не вибрано жодної дати.</div>';
+  document.querySelectorAll('[data-dd]').forEach(autoExpand);
+}
+
+function collectDateTexts(){
+  document.querySelectorAll('[data-dd]').forEach(x=>S.draft[x.dataset.dd]=x.value.trim());
+  document.querySelectorAll('[data-status-d]').forEach(x=>S.draftStatuses[x.dataset.statusD]=x.checked);
+}
+
+function saveActivity(ev,aid){
+  ev.preventDefault();
+  collectDateTexts();
+  let p={userId:S.targetUserId,name:aName.value.trim(),description:aDesc.value.trim(),color:aColor.value,schedules:{...S.draft},statuses:{...S.draftStatuses}};
+  if(aid) Object.assign(S.data.activities.find(x=>x.id===aid),p);
+  else S.data.activities.push({id:id(),...p,createdAt:new Date().toISOString()});
+  save();
+  closeModal();
+}
+
+function delActivity(aid){
+  if(!confirm('Видалити активність? Записи залишаться, але без привʼязки.'))return;
+  S.data.activities=S.data.activities.filter(x=>x.id!==aid);
+  S.data.notes.forEach(n=>{if(n.activityId===aid)n.activityId=''});
+  S.data.hiddenActivityIds=S.data.hiddenActivityIds.filter(x=>x!==aid);
+  save();
+}
+
+function toggleDayActDescVisibility(aid,visible){
+  let target=document.getElementById(`day-act-desc-block-${aid}`);
+  if(target)target.classList.toggle('hidden',!visible);
+}
+
+function saveDayDirectChanges(k){
+  let elements=document.querySelectorAll('[data-day-act-text]');
+  elements.forEach(el=>{
+    let aid=el.dataset.dayActText;
+    let text=el.value.trim();
+    let act=S.data.activities.find(x=>x.id===aid);
+    if(act&&act.schedules)act.schedules[k]=text;
+  });
+  let checkboxes=document.querySelectorAll('[data-day-act-status]');
+  checkboxes.forEach(cb=>{
+    let aid=cb.dataset.dayActStatus;
+    let checked=cb.checked;
+    let act=S.data.activities.find(x=>x.id===aid);
+    if(act){if(!act.statuses)act.statuses={};act.statuses[k]=checked;}
+  });
+  save();
+  msgDayModal('Зміни збережено!',false);
+}
+
+function msgDayModal(txt,isErr=false){
+  let box=document.getElementById('dayModalMsg');
+  if(!box)return;
+  box.innerHTML=`<div class="msg ${isErr?'err':''}">${txt}</div>`;
+  setTimeout(()=>{box.innerHTML=''},2500);
+}
+
+function openDay(k){
+  let aa=actsFor(k,false),notes=S.data.notes.filter(n=>n.date===k&&n.createdBy===S.targetUserId);
+  modal(`<div class="modalHead"><div><h2>${fmt(k)}</h2><p class="hint">Активності дня і записи для користувача.</p></div><button class="small secondary" onclick="closeModal()">Закрити</button></div><div id="dayModalMsg"></div><h3>Активності дня</h3><div class="list">${aa.length?aa.map(a=>{let isDone=(a.statuses&&a.statuses[k]===true);return `<div class="item" style="border-left:5px solid ${a.color}"><div class="row"><div><span class="dot" style="background:${a.color}"></span><b>${esc(a.name)} ${visible(a.id)?'':'(приховано)'}</b></div><div style="display:inline-flex;gap:12px;align-items:center"><label class="inline-check"><input type="checkbox" data-day-act-status="${a.id}" ${isDone?'checked':''} onchange="saveDayDirectChanges('${k}')"> Виконано</label><label class="inline-check" style="font-weight:400;color:var(--muted)"><input type="checkbox" checked onchange="toggleDayActDescVisibility('${a.id}',this.checked)"> Показувати опис</label><button class="small secondary" onclick="closeModal();openActivity('${a.id}','${k}')">Налаштування</button></div></div><div id="day-act-desc-block-${a.id}" style="margin-top:10px"><textarea data-day-act-text="${a.id}" placeholder="Введіть опис або звіт для активності ${esc(a.name)} на цю дату..." oninput="autoExpand(this)" onblur="saveDayDirectChanges('${k}')">${esc(a.schedules[k]||'')}</textarea></div></div>`}).join(''):'<div class="empty">На цей день активностей немає.</div>'}</div><h3>Додаткові записи дня</h3><div class="list">${notes.length?notes.map(n=>{let a=S.data.activities.find(x=>x.id===n.activityId);return `<div class="entry"><div class="row"><div><b>${esc(n.title)}</b><div class="entryAct">${a?`<span class="dot" style="background:${a.color};width:10px;height:10px"></span>${esc(a.name)}`:'Без активності'}</div><div class="muted" style="margin-top:6px">${esc(n.text)}</div></div><div><button class="small secondary" onclick="editNote('${n.id}','${k}')">Ред.</button> <button class="small danger" onclick="delNote('${n.id}','${k}')">×</button></div></div></div>`}).join(''):'<div class="empty">Додаткових записів немає.</div>'}</div><form onsubmit="saveNote(event,'${k}')"><input id="noteId" type="hidden"><div class="field"><label>Пов'язана активність</label><select id="noteAct"><option value="">Без привʼязки</option>${aa.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></div><div class="field"><label>Назва запису</label><input id="noteTitle" required></div><div class="field"><label>Опис запису</label><textarea id="noteText" required oninput="autoExpand(this)"></textarea></div><div class="modalActions"><button type="button" class="secondary" onclick="closeModal()">Закрити</button><button id="noteBtn">Додати запис</button></div></form>`);
+  document.querySelectorAll('[data-day-act-text]').forEach(autoExpand);
+}
+
+function saveNote(ev,k){ev.preventDefault();let nid=noteId.value,p={title:noteTitle.value.trim(),text:noteText.value.trim(),activityId:noteAct.value};if(nid)Object.assign(S.data.notes.find(n=>n.id===nid),p);else S.data.notes.push({id:id(),date:k,...p,createdBy:S.targetUserId,createdAt:new Date().toISOString()});save();openDay(k);}
+function editNote(nid,k){let n=S.data.notes.find(x=>x.id===nid);noteId.value=n.id;noteAct.value=n.activityId||'';noteTitle.value=n.title;noteText.value=n.text;autoExpand(noteText);noteBtn.textContent='Зберегти запис'}
+function delNote(nid,k){if(confirm('Видалити запис?')){S.data.notes=S.data.notes.filter(n=>n.id!==nid);save();openDay(k);}}
+
+function modal(html){modalRoot.innerHTML=`<div class="modalBg" onclick="if(event.target.classList.contains('modalBg'))closeModal()"><div class="modal">${html}</div></div>`}
+function closeModal(){modalRoot.innerHTML=''}
+
+function exportData(){let blob=new Blob([JSON.stringify(S.data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='activity-calendar-crm-backup.json';a.click();URL.revokeObjectURL(url)}
+function importData(ev){let f=ev.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!Array.isArray(d.users))return alert('Це не резервна копія.');S.data=d;save();alert('Імпортовано успішно.')}catch(e){alert('Не вдалося прочитати файл.')}};r.readAsText(f)}
+
+// Запуск програми
+load();
+</script></body></html>
