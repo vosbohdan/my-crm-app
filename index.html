@@ -87,25 +87,15 @@ const DEFAULT_FIELDS=[
   {id:"diagnosis",label:"Діагноз",required:true,rows:2,active:true,system:true},
   {id:"recommendations",label:"Рекомендації",required:true,rows:4,active:true,system:true}
 ];
-function load(k,d){try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}}
+function load(k,d){try{if(String(k).startsWith('mf_'))return JSON.parse(JSON.stringify(d));return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}}
 function save(k,v){
   localStorage.setItem(k,JSON.stringify(v));
   if(window.medSaveToCloud&&!window.MED_APPLYING_CLOUD){window.medSaveToCloud(k,v)}
 }
-let doctors=load("mf_doctors",[
-  {id:1,login:"admin",password:"admin123",name:"Адміністратор",spec:"Адміністратор",role:"admin",extra:""},
-  {id:2,login:"dr.kushnir",password:"1234",name:"Кушнір Є.В.",spec:"Ортопед-травматолог",role:"doctor",extra:""},
-  {id:3,login:"dr.ivanova",password:"1234",name:"Іванова О.П.",spec:"Педіатр",role:"doctor",extra:""},
-  {id:4,login:"manager",password:"manager123",name:"Менеджер",spec:"Менеджер",role:"manager",extra:""}
-]);
+let doctors=load("mf_doctors",[]);
 doctors=doctors.map((d,i)=>({...d,role:d.role||(i===0?"admin":"doctor")}));
-if(!doctors.some(d=>d.login==="manager")){doctors.push({id:4,login:"manager",password:"manager123",name:"Менеджер",spec:"Менеджер",role:"manager",extra:""});}
-save("mf_doctors",doctors);
 normalizeSpecialists();
-let patients=load("mf_patients",[
-  {id:1,name:"Вощенко Богдан Анатолійович",dob:"1995-04-18",phone:""},
-  {id:2,name:"Коваль Марія Степанівна",dob:"1980-06-22",phone:"+380671234567"}
-]);
+let patients=load("mf_patients",[]);
 let consultations=load("mf_consultations",[]);
 let deleteRequests=load("mf_delete_requests",[]);
 let appointments=load("mf_appointments",[]);
@@ -130,7 +120,7 @@ const mfDb=firebase.database();
 mfAuth.languageCode='uk';
 const MF_SHARED_PATH='medfamily_data/shared';
 const MF_PROFILES_PATH='medfamily_data/authProfiles';
-const MF_KEYS=['mf_specialists','mf_doctors','mf_patients','mf_consultations','mf_delete_requests','mf_appointments','mf_appointment_alerts','mf_work_schedules','mf_fields','mf_doctor_fields','mf_field_templates','mf_settings_collapsed','mf_delete_keyword','mf_patient_notes','mf_draft_consultations','mf_weekly_work_schedules','mf_side_delete_enabled','mf_viewed_consult_datetime'];
+const MF_KEYS=['mf_specialists','mf_doctors','mf_patients','mf_consultations','mf_delete_requests','mf_appointments','mf_appointment_alerts','mf_work_schedules','mf_fields','mf_doctor_fields','mf_field_templates','mf_settings_collapsed','mf_delete_keyword','mf_patient_notes','mf_draft_consultations','mf_weekly_work_schedules','mf_side_delete_enabled','mf_viewed_consult_datetime','mf_patient_events'];
 let mfSharedRef=null,mfSharedHandler=null,mfCloudReady=false;
 function mfAuthError(e){let c=e?.code||'';if(c.includes('email-already-in-use'))return 'Такий email вже зареєстрований.';if(c.includes('invalid-email'))return 'Некоректний email.';if(c.includes('wrong-password')||c.includes('invalid-credential'))return 'Невірний email або пароль.';if(c.includes('user-not-found'))return 'Користувача з таким email не знайдено.';if(c.includes('weak-password'))return 'Пароль має бути мінімум 6 символів.';if(c.includes('too-many-requests'))return 'Забагато спроб. Спробуйте пізніше.';if(c.includes('popup-closed-by-user'))return 'Вікно Google-входу було закрито.';if(c.includes('popup-blocked'))return 'Браузер заблокував pop-up. Дозвольте спливаючі вікна або спробуйте ще раз.';if(c.includes('permission-denied'))return 'Немає доступу до Firebase Database. Перевірте Rules.';return e?.message||'Сталася помилка.'}
 function mfLocalSnapshot(){let o={};MF_KEYS.forEach(k=>{try{let raw=localStorage.getItem(k); if(raw!==null)o[k]=JSON.parse(raw)}catch(e){}});return o}
@@ -2153,6 +2143,230 @@ bind=function(){
 };
 
 (function(){const st=document.createElement('style');st.textContent=`#btnCabinetToday{white-space:nowrap}.modal-box .consult-datetime-editor{margin-top:8px}`;document.head.appendChild(st)})();
+
+
+
+/* === Firebase Auth approval workflow patch ===
+   - First confirmed user becomes approved admin.
+   - Next users are pending until admin approves them.
+   - Names/roles are read from Firebase Database, not overwritten from Google on every login.
+   - Data source of truth is Firebase Database; startup demo data was removed.
+*/
+let mfProfilesRef=null,mfProfilesHandler=null;
+state.pendingApproval=false;
+state.pendingProfile=null;
+state.authProfiles={};
+
+function mfDefaultSharedData(){
+  return {
+    mf_specialists:[...DEFAULT_SPECIALISTS],
+    mf_doctors:[],
+    mf_patients:[],
+    mf_consultations:[],
+    mf_delete_requests:[],
+    mf_appointments:[],
+    mf_appointment_alerts:[],
+    mf_work_schedules:{},
+    mf_fields:cloneFields(DEFAULT_FIELDS),
+    mf_doctor_fields:{},
+    mf_field_templates:{},
+    mf_settings_collapsed:{},
+    mf_delete_keyword:'ВИДАЛИТИ',
+    mf_patient_notes:{},
+    mf_draft_consultations:{},
+    mf_weekly_work_schedules:{},
+    mf_patient_events:[]
+  };
+}
+function mfClearLocalCache(){
+  const keys=[...MF_KEYS,'mf_patient_events','mf_weekly_work_schedules','mf_side_delete_enabled','mf_viewed_consult_datetime'];
+  keys.forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+}
+function mfDetachProfiles(){if(mfProfilesRef&&mfProfilesHandler){mfProfilesRef.off('value',mfProfilesHandler)}mfProfilesRef=null;mfProfilesHandler=null;}
+const __mfOldDetachSharedApproval=mfDetachShared;
+mfDetachShared=function(){try{__mfOldDetachSharedApproval()}catch(e){}; mfDetachProfiles(); mfCloudReady=false;}
+
+async function mfEnsureSharedData(){
+  const ref=mfDb.ref(MF_SHARED_PATH);
+  const snap=await ref.get();
+  if(!snap.exists()){
+    const base=mfDefaultSharedData();
+    // Якщо перший адмін уже створився перед ініціалізацією shared-гілки, зберігаємо його.
+    if(Array.isArray(doctors)&&doctors.length)base.mf_doctors=doctors;
+    await ref.set(base);
+    mfApplyCloudData(base);
+  }else{
+    const data=snap.val()||{};
+    const base=mfDefaultSharedData();
+    const updates={};
+    Object.keys(base).forEach(k=>{if(data[k]===undefined)updates[k]=base[k]});
+    if(Object.keys(updates).length)await ref.update(updates);
+    mfApplyCloudData({...base,...data,...updates});
+  }
+}
+
+async function mfEnsureUserProfile(user){
+  const profilesRef=mfDb.ref(MF_PROFILES_PATH);
+  const allSnap=await profilesRef.get();
+  const all=allSnap.val()||{};
+  const ref=profilesRef.child(user.uid);
+  let p=(await ref.get()).val();
+  if(!p){
+    const first=Object.keys(all).length===0;
+    const name=(user.displayName||user.email?.split('@')[0]||'Користувач').trim();
+    p={
+      uid:user.uid,
+      email:user.email||'',
+      name,
+      doctorId:first?user.uid:null,
+      role:first?'admin':'doctor',
+      status:first?'approved':'pending',
+      createdAt:new Date().toISOString(),
+      provider:(user.providerData||[]).map(x=>x.providerId).join(',')
+    };
+    await ref.set(p);
+  }
+  state.pendingApproval=p.status!=='approved';
+  state.pendingProfile=p;
+  state.authProfiles={...all,[user.uid]:p};
+  if(state.pendingApproval){
+    state.doctor=null;
+    state.authUser=user;
+    state.loginError='';
+    return p;
+  }
+  let doc=doctors.find(d=>String(d.authUid||'')===String(user.uid)) || doctors.find(d=>String(d.id)===String(p.doctorId));
+  if(!doc){
+    doc={
+      id:p.doctorId||user.uid,
+      login:p.email||user.email||'',
+      password:'',
+      email:p.email||user.email||'',
+      name:p.name||user.email||'Користувач',
+      spec:p.role==='admin'?'Адміністратор':(p.role==='manager'?'Менеджер':'Терапевт'),
+      role:p.role||'doctor',
+      extra:'',
+      authUid:user.uid,
+      approvedAt:p.approvedAt||new Date().toISOString()
+    };
+    doctors.push(doc);
+    save('mf_doctors',doctors);
+    await ref.update({doctorId:doc.id});
+  }else{
+    let changed=false;
+    // Імʼя беремо з бази/картки лікаря, а не перезаписуємо з Google.
+    if(p.name&&doc.name!==p.name){doc={...doc,name:p.name};changed=true;}
+    if(p.role&&doc.role!==p.role){doc={...doc,role:p.role,spec:p.role==='admin'?'Адміністратор':(p.role==='manager'?'Менеджер':doc.spec)};changed=true;}
+    if(!doc.authUid){doc={...doc,authUid:user.uid};changed=true;}
+    if(!doc.email){doc={...doc,email:p.email||user.email||''};changed=true;}
+    if(changed){doctors=doctors.map(d=>String(d.id)===String(doc.id)?doc:d);save('mf_doctors',doctors);}
+  }
+  state.doctor=doc;
+  state.authUser=user;
+  state.loginError='';
+  return p;
+}
+
+async function mfStartAppForUser(user){
+  state.authUser=user; state.authVerify=false; state.authReady=false; state.pendingApproval=false; r();
+  await mfEnsureUserProfile(user);
+  if(state.pendingApproval){state.authReady=true; r(); return;}
+  await mfEnsureSharedData();
+  // Після завантаження shared-даних ще раз підтягуємо лікаря вже з хмари.
+  await mfEnsureUserProfile(user);
+  mfCloudReady=true;
+  mfSharedRef=mfDb.ref(MF_SHARED_PATH);
+  mfSharedHandler=s=>{mfApplyCloudData(s.val()||{}); if(state.doctor){let fresh=doctors.find(d=>String(d.id)===String(state.doctor.id)); if(fresh)state.doctor=fresh;} r();};
+  mfSharedRef.on('value',mfSharedHandler,e=>alert(mfAuthError(e)));
+  if(isAdmin()){
+    mfProfilesRef=mfDb.ref(MF_PROFILES_PATH);
+    mfProfilesHandler=s=>{state.authProfiles=s.val()||{}; r();};
+    mfProfilesRef.on('value',mfProfilesHandler,e=>console.warn(e));
+  }
+  state.authReady=true; r();
+}
+
+function pendingApprovalPage(){
+  const p=state.pendingProfile||{};
+  return `<div class="login-wrap"><div class="login-card"><div class="logo-row"><div class="logo-heart">♥</div><div><div class="logo-name">МедФемілі</div><div class="logo-sub">Медичний центр</div></div></div><h2 style="color:var(--dark);margin-bottom:8px">Очікується підтвердження адміна</h2><div class="demo-hint" style="text-align:left">Ваш акаунт створено, але доступ до кабінету ще не відкрито.<br><br><b>Email:</b> ${esc(p.email||state.authUser?.email||'')}<br><b>Імʼя:</b> ${esc(p.name||'')}</div><button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="logout()">Вийти</button></div></div>`;
+}
+const __buildAppApproval=buildApp;
+buildApp=function(){if(!state.authReady)return loadingPage();if(state.authVerify)return verifyPage();if(state.pendingApproval)return pendingApprovalPage();return __buildAppApproval();}
+
+async function logout(){
+  mfDetachShared();
+  state.doctor=null;state.authUser=null;state.pendingApproval=false;state.pendingProfile=null;state.page='cabinet';
+  mfCloudReady=false;
+  mfClearLocalCache();
+  await mfAuth.signOut();
+  state.authReady=true;
+  r();
+}
+
+function authProfilesList(){return Object.values(state.authProfiles||{}).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))}
+function pendingProfiles(){return authProfilesList().filter(p=>p.status!=='approved')}
+function pendingUsersSettings(){
+  if(!isAdmin())return '';
+  const list=pendingProfiles();
+  return `<section class="card"><div class="card-title">Нові користувачі, які очікують підтвердження</div>${list.length?list.map(p=>`<div class="doctor-row"><div class="avatar avatar-sm">${initials(p.name||p.email)}</div><div style="flex:1"><b>${esc(p.name||'Без імені')}</b><div class="muted" style="font-size:12px">${esc(p.email||'')} · статус: очікує підтвердження</div></div><button class="btn btn-green btn-small" data-approve-user="${esc(p.uid)}">Підтвердити</button><button class="btn btn-danger btn-small" data-reject-user="${esc(p.uid)}">Відхилити</button></div>`).join(''):`<div class="empty">Нових заявок немає</div>`}</section>`;
+}
+async function approveAuthUser(uid){
+  const p=(state.authProfiles||{})[uid]; if(!p)return alert('Користувача не знайдено');
+  const role=prompt('Роль для користувача: doctor / manager / admin', p.role||'doctor');
+  if(role===null)return;
+  const cleanRole=['doctor','manager','admin'].includes(role)?role:'doctor';
+  const spec=cleanRole==='admin'?'Адміністратор':(cleanRole==='manager'?'Менеджер':'Терапевт');
+  const doctorId=p.doctorId||uid;
+  let doc=doctors.find(d=>String(d.id)===String(doctorId)||String(d.authUid||'')===String(uid));
+  if(!doc){doc={id:doctorId,login:p.email||'',password:'',email:p.email||'',name:p.name||p.email||'Користувач',spec,role:cleanRole,extra:'',authUid:uid,approvedAt:new Date().toISOString()};doctors.push(doc)}
+  else{doc={...doc,email:p.email||doc.email,login:p.email||doc.login,name:doc.name||p.name||p.email,role:cleanRole,spec:cleanRole==='admin'?'Адміністратор':(cleanRole==='manager'?'Менеджер':doc.spec||'Терапевт'),authUid:uid};doctors=doctors.map(d=>String(d.id)===String(doc.id)?doc:d)}
+  save('mf_doctors',doctors);
+  await mfDb.ref(`${MF_PROFILES_PATH}/${uid}`).update({status:'approved',role:cleanRole,doctorId:doc.id,name:doc.name,email:p.email||'',approvedAt:new Date().toISOString(),approvedBy:state.doctor?.name||'Адмін'});
+  alert('✓ Користувача підтверджено');
+}
+async function rejectAuthUser(uid){
+  const p=(state.authProfiles||{})[uid]; if(!p)return;
+  if(!confirm(`Відхилити доступ для ${p.email||p.name}?`))return;
+  await mfDb.ref(`${MF_PROFILES_PATH}/${uid}`).update({status:'rejected',rejectedAt:new Date().toISOString(),rejectedBy:state.doctor?.name||'Адмін'});
+}
+
+const __settingsPageApproval=settingsPage;
+settingsPage=function(){return `<div class="page-header"><div class="page-title">Налаштування</div><div class="page-sub">Профіль, графік, лікарі та поля консультації</div></div>${pendingUsersSettings()}${profileSettings()}${isAdmin()?specialtiesSettings():''}${scheduleSettings()}${state.doctor?.role!=='manager'?fieldsSettings():''}${doctorsSettings()}${isAdmin()?sideDeleteSettings():''}${(isAdmin()||isManager())?deleteRequestsSettings():''}${isAdmin()?dataSettings():''}`;}
+
+const __doctorsSettingsApproval=doctorsSettings;
+doctorsSettings=function(){
+  let info=isAdmin()?`<div class="muted" style="font-size:13px;margin-bottom:10px">Пароль лікаря адміністратор не змінює. Пароль змінюється самим користувачем через Firebase Auth / «Відновити пароль».</div>`:'';
+  return `<section class="card"><div class="card-title">Лікарі системи</div>${info}${doctors.length?doctors.map(doc=>`<div class="doctor-row"><div class="avatar avatar-sm">${initials(doc.name)}</div><div style="flex:1"><b>${esc(doc.name)}</b> ${doc.id===state.doctor.id?'<span class="pill">Ви</span>':''} <span class="role-badge ${doc.role==='admin'?'admin-badge':''}">${roleLabel(doc.role)}</span><div class="muted" style="font-size:12px">${esc(doc.spec)} · ${doc.consultTitle?`для консультації: ${esc(doc.consultTitle)} · `:''}${esc(doc.email||doc.login||'')}</div></div>${(isAdmin()||isManager())&&doc.id!==state.doctor.id?`<button class="btn btn-secondary btn-small" data-edit-doctor="${doc.id}">Редагувати</button>${isAdmin()?`<button class="btn btn-danger btn-small" data-del-doctor="${doc.id}">Видалити</button>`:''}`:''}</div>`).join(''):'<div class="empty">Поки немає підтверджених лікарів.</div>'}${isAdmin()?`<div class="muted" style="font-size:12px;margin-top:12px">Нових лікарів краще додавати через їхню реєстрацію email/Google і підтвердження адміністратором.</div>`:`<div class="muted" style="font-size:13px;margin-top:12px">Ви бачите список лікарів, але редагувати можете тільки свій профіль.</div>`}</section>`;
+}
+
+doctorEditModal=function(){
+  let d=state.editDoctor||state.newDoctor;let isEdit=!!state.editDoctor;
+  let roleSelect=isAdmin()?`<select id="docRole"><option value="doctor" ${(!d.role||d.role==='doctor')?'selected':''}>Лікар</option><option value="manager" ${d.role==='manager'?'selected':''}>Менеджер</option><option value="admin" ${d.role==='admin'?'selected':''}>Адмін</option></select>`:`<input id="docRole" value="${esc(d.role||'doctor')}" disabled>`;
+  return `<div class="modal-bg"><div class="modal-box"><div class="modal-title">${isEdit?'Редагування лікаря':'Новий лікар'}</div><div class="grid2"><div><div class="field-label">ПІБ <span class="req">*</span></div><input id="docName" value="${esc(d.name||'')}"></div><div><div class="field-label">Email / логін</div><input id="docLogin" value="${esc(d.email||d.login||'')}" ${d.authUid?'disabled':''}></div></div><div class="grid2" style="margin-top:12px"><div><div class="field-label">Пароль</div><input disabled value="Пароль змінюється користувачем через Firebase"><div class="muted" style="font-size:11px;margin-top:4px">Адмін не бачить і не змінює пароль користувача.</div></div><div><div class="field-label">Роль</div>${roleSelect}</div></div><div class="grid2" style="margin-top:12px"><div><div class="field-label">Спеціальність</div><select id="docSpec">${specialists.map(s=>`<option ${d.spec===s?'selected':''}>${s}</option>`).join('')}</select></div><div><div class="field-label">Для консультації</div><input id="docConsultTitle" value="${esc(d.consultTitle||'')}" placeholder="напр. дитячого невролога"></div></div><div style="margin-top:12px"><div class="field-label">Кваліфікація / примітка</div><input id="docExtra" value="${esc(d.extra||'')}"></div><div id="docErr" class="error-msg" style="display:none">Заповніть обов'язкові поля</div><div class="modal-actions"><button class="btn btn-secondary" data-close-modal>Скасувати</button><button class="btn btn-green" id="btnSaveDoctor">Зберегти</button></div></div></div>`;
+};
+
+saveDoctor=function(){
+  let name=document.getElementById('docName').value.trim(),login=document.getElementById('docLogin').value.trim(),role=document.getElementById('docRole').value,spec=document.getElementById('docSpec').value,extra=document.getElementById('docExtra').value.trim(),consultTitle=document.getElementById('docConsultTitle')?.value.trim()||'';
+  if(!name){document.getElementById('docErr').style.display='block';return}
+  if(!isAdmin()&&state.editDoctor){role=state.editDoctor.role||'doctor'}
+  if(state.editDoctor){
+    const old=state.editDoctor;
+    const updated={...old,name,login:old.authUid?(old.email||old.login):login,email:old.email||login,password:'',role,spec:role==='admin'?'Адміністратор':(role==='manager'?'Менеджер':spec),extra,consultTitle};
+    doctors=doctors.map(d=>String(d.id)===String(old.id)?updated:d);
+    if(updated.authUid){mfDb.ref(`${MF_PROFILES_PATH}/${updated.authUid}`).update({name:updated.name,role:updated.role,doctorId:updated.id,status:'approved',email:updated.email||''}).catch(e=>console.warn(e));}
+  }else{
+    const newId=uid();
+    doctors.push({id:newId,name,login,email:login,password:'',role,spec:role==='admin'?'Адміністратор':(role==='manager'?'Менеджер':spec),extra,consultTitle});
+  }
+  save('mf_doctors',doctors);state.modal=null;state.editDoctor=null;r();
+}
+
+const __bindApproval=bind;
+bind=function(){
+  __bindApproval();
+  document.querySelectorAll('[data-approve-user]').forEach(el=>el.onclick=()=>approveAuthUser(el.dataset.approveUser));
+  document.querySelectorAll('[data-reject-user]').forEach(el=>el.onclick=()=>rejectAuthUser(el.dataset.rejectUser));
+};
 
 
 reconcileDoneStatuses();
