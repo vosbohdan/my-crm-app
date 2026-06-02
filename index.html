@@ -2251,7 +2251,11 @@ async function mfEnsureUserProfile(user){
     };
     doctors.push(doc);
     save('mf_doctors',doctors);
-    await ref.update({doctorId:doc.id});
+    // На повторному вході з нового пристрою профіль уже існує, а звичайний лікар не має права писати в authProfiles.
+    // doctorId оновлюємо тільки якщо його ще немає; помилку прав не зупиняємо, бо доступ уже підтверджений у профілі.
+    if(!p.doctorId){
+      try{await ref.update({doctorId:doc.id})}catch(e){console.warn('Profile doctorId update skipped:', e?.code||e)}
+    }
   }else{
     let changed=false;
     // Імʼя беремо з бази/картки лікаря, а не перезаписуємо з Google.
