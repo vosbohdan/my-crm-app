@@ -2759,6 +2759,158 @@ bind=function(){
 };
 
 
+
+/* === v3_39 patch: appointment-note targeting, consultation sorting, pending consultation delete, patient-note flush, archive dedupe === */
+(function(){const st=document.createElement('style');st.textContent=`
+.consult-delete-badge{display:inline-flex;align-items:center;gap:5px;background:#fff8e6;color:#7a4f00;border:1px solid #ffe08a;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:800;margin:6px 0}
+.history-line{font-size:12px;color:#6b8c7e;margin-top:5px;line-height:1.35}
+`;document.head.appendChild(st)})();
+
+function consultationSortValue(c){
+  const a=(typeof appointmentForConsult==='function')?appointmentForConsult(c):null;
+  if(a && a.date && a.time) return `${a.date}T${a.time}:00`;
+  if(c?.date && c?.consultTime) return `${c.date}T${c.consultTime}:00`;
+  if(c?.date && c?.createdAt){
+    const t=(typeof consultTime==='function')?consultTime(c):'';
+    if(t) return `${c.date}T${t}:00`;
+  }
+  if(c?.createdAt) return String(c.createdAt);
+  return String(c?.date||'');
+}
+function sortConsultationsNewest(list){
+  return [...(list||[])].sort((a,b)=>String(consultationSortValue(b)).localeCompare(String(consultationSortValue(a))));
+}
+patientConsults=function(pid){
+  return sortConsultationsNewest(consultations.filter(c=>String(c.patientId)===String(pid)&&canViewConsultation(c)));
+};
+
+function consultationDeleteRequest(consultId,statuses=['pending']){
+  return deleteRequests.find(r=>r && (r.type==='consult'||r.type==='consultation') && String(r.id)===String(consultId) && statuses.includes(r.status));
+}
+function consultationDeleteBadgeHtml(consultId){
+  const req=consultationDeleteRequest(consultId,['pending']);
+  if(!req)return '';
+  const canCancel=String(req.requestedByDoctorId)===String(state.doctor?.id) || isAdmin() || isManager();
+  return `<div class="consult-delete-badge">⏳ Заявка на видалення консультації відправлена адміну/менеджеру${canCancel?` <button class="btn btn-secondary btn-small" data-cancel-delete-req="${req.id}">Скасувати</button>`:''}</div>`;
+}
+function dedupeDeleteRequests(){
+  if(!Array.isArray(deleteRequests)) deleteRequests=[];
+  const keep=[];
+  const archivedMap={};
+  deleteRequests.forEach(req=>{
+    if(!req)return;
+    const key=`${req.type||''}__${req.id||''}`;
+    if(req.status==='archived'){
+      const prev=archivedMap[key];
+      if(!prev){archivedMap[key]={...req,history:[...(req.history||[])]};keep.push(archivedMap[key]);}
+      else{
+        prev.history=[...(prev.history||[]),...(req.history||[]),{createdAt:req.createdAt,requestedByName:req.requestedByName,reason:req.reason,archivedAt:req.archivedAt,archivedBy:req.archivedBy,status:req.status}].filter(x=>x&&Object.values(x).some(Boolean));
+        if(String(req.archivedAt||req.createdAt||'')>String(prev.archivedAt||prev.createdAt||'')){
+          Object.assign(prev,{...req,history:prev.history});
+        }
+      }
+    }else keep.push(req);
+  });
+  deleteRequests=keep;
+}
+function deleteRequestHistoryHtml(req){
+  const h=Array.isArray(req.history)?req.history:[];
+  if(!h.length)return '';
+  return `<div class="history-line">Історія: ${h.length} попередн${h.length===1?'ій запис':'іх записи'} видалення/архіву збережено всередині цієї заявки.</div>`;
+}
+
+archiveDeleteRequest=function(reqId){
+  const req=deleteRequests.find(r=>String(r.id)===String(reqId));
+  if(!req)return;
+  const keyType=req.type, keyId=String(req.id);
+  const previous=deleteRequests.filter(r=>r.status==='archived'&&String(r.type)===String(keyType)&&String(r.id)===keyId&&String(r.id)!==String(reqId));
+  const history=[...(req.history||[])];
+  previous.forEach(r=>history.push(...(r.history||[]),{createdAt:r.createdAt,requestedByName:r.requestedByName,reason:r.reason,archivedAt:r.archivedAt,archivedBy:r.archivedBy,status:r.status}));
+  deleteRequests=deleteRequests.filter(r=>!(r.status==='archived'&&String(r.type)===String(keyType)&&String(r.id)===keyId&&String(r.id)!==String(reqId)));
+  deleteRequests=deleteRequests.map(r=>String(r.id)===String(reqId)?{...r,status:'archived',archivedAt:new Date().toISOString(),archivedBy:state.doctor.name,history}:r);
+  dedupeDeleteRequests();
+  save('mf_delete_requests',deleteRequests);
+  r();
+};
+restoreDeleteRequest=function(reqId){
+  deleteRequests=deleteRequests.map(r=>String(r.id)===String(reqId)?{...r,status:'pending',restoredAt:new Date().toISOString(),restoredBy:state.doctor.name}:r);
+  dedupeDeleteRequests();
+  save('mf_delete_requests',deleteRequests);
+  r();
+};
+
+const __confirmDelete_v339=confirmDelete;
+confirmDelete=function(){
+  __confirmDelete_v339();
+  dedupeDeleteRequests();
+  save('mf_delete_requests',deleteRequests);
+};
+
+const __deleteRequestsSettings_v339=deleteRequestsSettings;
+deleteRequestsSettings=function(){
+  dedupeDeleteRequests();
+  const pending=deleteRequests.filter(r=>r.status==='pending').sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  const archived=deleteRequests.filter(r=>r.status==='archived').sort((a,b)=>String(b.archivedAt||b.createdAt).localeCompare(String(a.archivedAt||a.createdAt)));
+  const renderReq=(req,arch=false)=>`<div class="consult-item"><div class="consult-title">${esc(requestTargetName(req))}</div><div class="consult-meta">${esc(requestTargetDescription(req))}<br>Запит від: ${esc(req.requestedByName||'')} · ${req.createdAt?new Date(req.createdAt).toLocaleString('uk-UA'):'—'}<br>Причина: ${esc(req.reason||'не вказано')}${deleteRequestHistoryHtml(req)}</div><div class="actions" style="margin-top:8px"><button class="btn btn-secondary btn-small" data-view-delete-req="${req.id}">Переглянути</button>${arch?`<button class="btn btn-green btn-small" data-restore-delete-req="${req.id}">Відновити із архіву</button>`:`<button class="btn btn-danger btn-small" data-approve-delete="${req.id}">Підтвердити видалення</button><button class="btn btn-secondary btn-small" data-archive-delete-req="${req.id}">В Архів</button><button class="btn btn-secondary btn-small" data-reject-delete="${req.id}">Повернути назад</button>`}</div></div>`;
+  return `<section class="card"><div class="card-title">Заявки на видалення / редагування</div><div class="muted" style="font-size:13px;margin-bottom:10px">Тут можна переглянути об’єкт заявки, підтвердити, повернути або тимчасово перемістити заявку в архів. Повторні архівування одного пацієнта обʼєднуються в один запис з історією.</div><div class="delete-archive-title">Активні заявки</div>${pending.length?pending.map(r=>renderReq(r,false)).join(''):`<div class="empty">Нових заявок немає</div>`}<div class="delete-archive-title">Архів</div>${archived.length?archived.map(r=>renderReq(r,true)).join(''):`<div class="empty">Архів порожній</div>`}</section>`;
+};
+
+function flushPatientNoteFromDom(){
+  document.querySelectorAll('[data-patient-note]').forEach(el=>{
+    patientNotes[noteKey(el.dataset.patientNote,el.dataset.noteDoctor)]=String(el.value||'');
+  });
+  clearTimeout(__patientNoteSaveTimer);
+  if(document.querySelector('[data-patient-note]')) savePatientNotes();
+}
+
+function patientModalConsultItemHtml(c){
+  return `<div class="consult-item"><div class="consult-title">${esc(c.doctorSpec)} · ${consultDateTimeLabel(c)}</div><div class="consult-meta">Лікар: ${esc(c.doctorName)} · створено ${consultCreatedLabel(c)}<br>ID консультації: ${esc(c.id)}${consultationVersionCount(c)?`<br>Версій: ${consultationVersionCount(c)+1}`:''}</div>${consultationDeleteBadgeHtml(c.id)}${consultButtonsPatientHtml(c)}</div>`;
+}
+patientModal=function(){
+  let p=state.modalData.patient;
+  let allCs=sortConsultationsNewest(patientConsults(p.id));
+  let ownCs=allCs.filter(c=>String(c.doctorId)===String(state.doctor?.id) || isAdmin() || isManager());
+  let showAll=!!state.modalData.showAllConsults;
+  let cs=showAll?allCs:ownCs;
+  let drafts=patientDrafts(p.id);let ownNote=getPatientNote(p.id,state.doctor.id);let allNotes=allPatientNotes(p.id);let showAllNotes=!!state.modalData.showAllNotes;
+  return `<div class="modal-bg"><div class="modal-box"><div class="actions" style="justify-content:space-between"><div><div class="modal-title">${esc(p.name)}</div><div class="modal-text">Дата народження: ${fmtDob(p.dob)} · ${age(p.dob)}${p.phone?`<br>Телефон: ${esc(fmtPhone(p.phone))}`:''}</div>${patientDeleteBadgeHtml(p.id)}</div><button class="btn btn-secondary btn-small" data-close-modal>✕</button></div><div class="actions"><button class="btn btn-green btn-small" data-consult="${p.id}" ${isPatientArchived(p.id)?'disabled':''}>Нова консультація</button><button class="btn btn-secondary btn-small" data-edit-patient="${p.id}">Редагувати дані</button></div><h3 style="font-size:15px;margin:16px 0 8px;color:var(--dark)">Інформація про пацієнта</h3><div class="row"><div class="field-label">Моя нотатка — зберігається при виході з картки або перемиканні нотаток</div><textarea rows="3" data-patient-note="${p.id}" data-note-doctor="${state.doctor.id}" placeholder="Наприклад: особливості спілкування, важливі нюанси, що треба знати при наступному прийомі...">${esc(ownNote)}</textarea><div class="muted" style="font-size:12px;margin-top:4px">Інші лікарі бачать вашу нотатку тільки після розгортання блоку нижче.</div></div><button class="btn btn-secondary btn-small" data-toggle-all-notes="${p.id}">${showAllNotes?'Сховати нотатки інших':'Показати нотатки інших лікарів'}</button>${showAllNotes?`<div style="margin-top:10px">${allNotes.length?allNotes.map(n=>`<div class="consult-item"><div class="consult-title">${esc(n.doctor.name)} · ${esc(n.doctor.spec)}</div><div class="consult-meta" style="white-space:pre-wrap;color:#243">${esc(n.text)}</div></div>`).join(''):`<div class="empty">Нотаток ще немає</div>`}</div>`:''}<h3 style="font-size:15px;margin:16px 0 8px;color:var(--dark)">Чернетки</h3>${drafts.length?drafts.map(d=>`<div class="consult-item"><div class="consult-title">Чернетка · ${new Date(d.updatedAt).toLocaleString('uk-UA')}</div><div class="consult-meta">Перевірте і збережіть або видаліть.</div><div class="actions" style="margin-top:8px"><button class="btn btn-green btn-small" data-open-draft="${d.id}">Відкрити</button><button class="btn btn-danger btn-small" data-delete-draft="${d.id}">Видалити</button></div></div>`).join(''):`<div class="empty">Чернеток немає</div>`}<h3 style="font-size:15px;margin:16px 0 8px;color:var(--dark)">Консультації</h3><div class="actions" style="margin-bottom:8px"><button class="btn btn-secondary btn-small" data-toggle-all-consults="${p.id}">${showAll?'Показати тільки мої консультації':'Показати консультації всіх лікарів'}</button><span class="muted" style="font-size:12px">Показано: ${cs.length} / ${allCs.length}</span></div>${cs.length?cs.map(patientModalConsultItemHtml).join(''):`<div class="empty">Консультацій у цьому режимі немає</div>`}</div></div>`;
+};
+
+cabinetPage=function(){
+  let html=__cabinetPage_v338();
+  const did=canManageSchedule()?String(state.cabinetDoctorId||state.doctor.id):String(state.doctor.id);
+  const date=state.cabinetDate||isoToday();
+  appointments.filter(a=>String(a.doctorId)===String(did)&&a.date===date).forEach(a=>{
+    const noteBtn=`<button class="btn btn-secondary btn-small" data-appt-note="${a.id}">Нотатки</button>`;
+    const doneTarget=`<button class="btn btn-green btn-small" data-appt-done="${a.id}"`;
+    const editTarget=`<button class="btn btn-secondary btn-small" data-edit-appt="${a.id}"`;
+    if(!html.includes(`data-appt-note="${a.id}"`)){
+      if(html.includes(doneTarget)) html=html.replace(doneTarget,noteBtn+doneTarget);
+      else if(html.includes(editTarget)) html=html.replace(editTarget,noteBtn+editTarget);
+    }
+    if(a.doctorNote && !html.includes(`note-indicator-${a.id}`)){
+      const noteText=`<div class="note-indicator" id="note-indicator-${a.id}">📝 Є нотатка до запису</div>`;
+      const search=`<div class="schedule-note">${esc(a.note||a.noShowReason||'')}</div>`;
+      if(html.includes(search)) html=html.replace(search,search+noteText);
+    }
+  });
+  return html;
+};
+
+const __bind_v339=bind;
+bind=function(){
+  __bind_v339();
+  document.querySelectorAll('[data-toggle-all-notes]').forEach(el=>{
+    el.onclick=(e)=>{e.preventDefault();flushPatientNoteFromDom();const p=patients.find(x=>String(x.id)===String(el.dataset.toggleAllNotes));if(p){state.modal='patient';state.modalData={...state.modalData,patient:p,showAllNotes:!state.modalData.showAllNotes};r();}}
+  });
+  document.querySelectorAll('[data-close-modal]').forEach(el=>{
+    el.addEventListener('click',()=>{flushPatientNoteFromDom();},{capture:true});
+  });
+  document.querySelectorAll('[data-cancel-delete-req]').forEach(el=>el.onclick=()=>cancelDeleteRequest(el.dataset.cancelDeleteReq));
+};
+
+dedupeDeleteRequests();
+
 reconcileDoneStatuses();
 
 r();
