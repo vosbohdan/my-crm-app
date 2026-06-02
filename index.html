@@ -346,7 +346,7 @@ function cabinetPage(){
   ${isMgr&&alerts.length?`<section class="card"><div class="card-title">Сповіщення для менеджера</div>${alerts.map(a=>`<div class="notice-box">⚠ ${esc(a.doctorName||"")} скасував запис: ${esc(a.patientName||"")} · ${fmtDob(a.date)} ${esc(a.time||"")}<div class="actions" style="margin-top:8px"><button class="btn btn-secondary btn-small" data-alert-seen="${a.id}">Позначити переглянутим</button></div></div>`).join("")}</section>`:""}
   ${!isMgr&&needDone.length?`<section class="card"><div class="card-title">Потрібно відмітити виконання</div>${needDone.map(a=>{let p=patients.find(x=>String(x.id)===String(a.patientId));return `<div class="notice-box">ℹ️ Консультація збережена, але запис ще не позначений як <b>Виконано</b>: ${esc(patientShortName(p))} · ${esc(a.time||"")}<div class="actions" style="margin-top:8px"><button class="btn btn-green btn-small" data-appt-done="${a.id}">Позначити виконано</button></div></div>`}).join("")}</section>`:""}
   <section class="card"><div class="actions" style="justify-content:space-between;align-items:flex-end"><div class="grid3" style="flex:1;max-width:${isMgr?'760px':'520px'}"><div><div class="field-label">Дата</div><input id="cabinetDate" type="date" value="${esc(date)}"></div>${isMgr?`<div><div class="field-label">Лікар</div><select id="cabinetDoctor">${docs.map(d=>`<option value="${d.id}" ${String(d.id)===String(did)?"selected":""}>${esc(d.name)} — ${esc(d.spec)}</option>`).join("")}</select></div>`:""}<div><div class="field-label">Робочий час</div><div class="muted" style="padding:10px 0;font-size:13px">${cfg.enabled?`${cfg.start}–${cfg.end}, слот ${cfg.slot||30} хв`:"Вихідний"}</div></div></div>${isMgr?`<button class="btn btn-secondary" id="btnGoScheduleSettings">Налаштувати графік</button>`:""}</div><div class="week-tabs">${wdates.map(d=>`<button class="week-tab ${d===date?"active":""} ${d===isoToday()?"today":""}" data-cabinet-day="${d}">${dayShort(d)}<span class="week-tab-date">${fmtDob(d).slice(0,5)}</span></button>`).join("")}</div>${managerSummary}</section>
-  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||"", past=isPastSlot(date,sl.end), doneAllowed=hasConsultationForAppointment(a);return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:""}<div class="schedule-note">${esc(a.note||'')}</div></div><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:""}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Скасовано</button>`:""}`:`<div class="schedule-free">Вільно</div>`}${isMgr?`${past&&!a?`<span class="muted" style="font-size:12px">минулий час</span>`:`<button class="btn btn-secondary btn-small" data-edit-appt="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" ${past&&!a?'disabled':''}>${a?'Змінити':'Записати'}</button>`}`:""}</div>`}).join("")})()}</div>`}</section>`
+  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||"", past=isSlotClosedForBooking(date,sl.time), doneAllowed=hasConsultationForAppointment(a);return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:""}<div class="schedule-note">${esc(a.note||'')}</div></div><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:""}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Скасовано</button>`:""}`:`<div class="schedule-free">Вільно</div>`}${isMgr?`${past&&!a?`<span class="muted" style="font-size:12px">минулий час</span>`:`<button class="btn btn-secondary btn-small" data-edit-appt="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" ${past&&!a?'disabled':''}>${a?'Змінити':'Записати'}</button>`}`:""}</div>`}).join("")})()}</div>`}</section>`
 }
 function scheduleSettings(){
   if(!canManageSchedule())return"";
@@ -1027,7 +1027,7 @@ cabinetPage=function(){
   ${mv?`<section class="card" style="border-color:#f0a640;background:#fff9ec"><div class="card-title">Перенесення запису</div><div class="muted" style="font-size:13px;margin-bottom:8px">Оберіть вільний слот і натисніть <b>Сюди</b>. Переноситься: ${esc(patientShortName(patients.find(p=>String(p.id)===String(mv.patientId))))} · ${fmtDob(mv.date)} ${esc(mv.time||'')}</div><button class="btn btn-secondary btn-small" data-cancel-move-appt>Скасувати перенесення</button></section>`:''}
   ${!isMgr&&needDone.length?`<section class="card"><div class="card-title">Потрібно відмітити виконання</div>${needDone.map(a=>{let p=patients.find(x=>String(x.id)===String(a.patientId));return `<div class="notice-box">ℹ️ Консультація збережена, але запис ще не позначений як <b>Виконано</b>: ${esc(patientShortName(p))} · ${esc(a.time||'')}<div class="actions" style="margin-top:8px"><button class="btn btn-green btn-small" data-appt-done="${a.id}">Позначити виконано</button></div></div>`}).join('')}</section>`:''}
   <section class="card"><div class="actions" style="justify-content:space-between;align-items:flex-end"><div class="grid3" style="flex:1;max-width:${isMgr?'760px':'520px'}"><div><div class="field-label">Дата</div><input id="cabinetDate" type="date" value="${esc(date)}"></div>${isMgr?`<div><div class="field-label">Лікар</div><select id="cabinetDoctor">${docs.map(d=>`<option value="${d.id}" ${String(d.id)===String(did)?'selected':''}>${esc(d.name)} — ${esc(d.spec)}</option>`).join('')}</select></div>`:''}<div><div class="field-label">Робочий час</div><div class="muted" style="padding:10px 0;font-size:13px">${cfg.enabled?`${cfg.start}–${cfg.end}, слот ${cfg.slot||30} хв`:'Вихідний'}</div></div></div>${isMgr?`<button class="btn btn-secondary" id="btnGoScheduleSettings">Налаштувати графік</button>`:''}</div><div class="week-tabs">${wdates.map(d=>`<button class="week-tab ${d===date?'active':''} ${d===isoToday()?'today':''}" data-cabinet-day="${d}">${dayShort(d)}<span class="week-tab-date">${fmtDob(d).slice(0,5)}</span></button>`).join('')}</div>${managerSummary}</section>
-  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||'', past=isPastSlot(date,sl.end), doneAllowed=hasConsultationForAppointment(a), canMoveHere=!!mv&&!a&&!past;return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-id="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:''}<div class="schedule-note">${esc(a.note||'')}</div></div><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${isMgr?`<button class="btn btn-secondary btn-small" data-edit-appt="${a.id}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Змінити</button><button class="btn btn-secondary btn-small" data-move-appt="${a.id}">Перенести</button>`:''}${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:''}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Скасовано</button>`:''}`:`<div class="schedule-free">Вільно</div>`}${isMgr&&!a?`${past?`<span class="muted" style="font-size:12px">минулий час</span>`:canMoveHere?`<button class="btn btn-green btn-small" data-move-here data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Сюди</button>`:`<button class="btn btn-secondary btn-small" data-edit-appt="" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Записати</button>`}`:''}</div>`}).join('')})()}</div>`}</section>`;
+  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||'', past=isSlotClosedForBooking(date,sl.time), doneAllowed=hasConsultationForAppointment(a), canMoveHere=!!mv&&!a&&!past;return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-id="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:''}<div class="schedule-note">${esc(a.note||'')}</div></div><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${isMgr?`<button class="btn btn-secondary btn-small" data-edit-appt="${a.id}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Змінити</button><button class="btn btn-secondary btn-small" data-move-appt="${a.id}">Перенести</button>`:''}${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:''}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Скасовано</button>`:''}`:`<div class="schedule-free">Вільно</div>`}${isMgr&&!a?`${past?`<span class="muted" style="font-size:12px">минулий час</span>`:canMoveHere?`<button class="btn btn-green btn-small" data-move-here data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Сюди</button>`:`<button class="btn btn-secondary btn-small" data-edit-appt="" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Записати</button>`}`:''}</div>`}).join('')})()}</div>`}</section>`;
 };
 
 appointmentModal=function(){
@@ -1233,7 +1233,7 @@ cabinetPage=function(){
   ${mv?`<section class="card" style="border-color:#f0a640;background:#fff9ec"><div class="card-title">Перенесення запису</div><div class="muted" style="font-size:13px;margin-bottom:8px">Оберіть вільний слот і натисніть <b>Сюди</b>. Переноситься: ${esc(patientShortName(patients.find(p=>String(p.id)===String(mv.patientId))))} · ${fmtDob(mv.date)} ${esc(mv.time||'')}</div><button class="btn btn-secondary btn-small" data-cancel-move-appt>Скасувати перенесення</button></section>`:''}
   ${!isMgr&&needDone.length?`<section class="card"><div class="card-title">Потрібно відмітити виконання</div>${needDone.map(a=>{let p=patients.find(x=>String(x.id)===String(a.patientId));return `<div class="notice-box">ℹ️ Консультація збережена, але запис ще не позначений як <b>Виконано</b>: ${esc(patientShortName(p))} · ${esc(a.time||'')}<div class="actions" style="margin-top:8px"><button class="btn btn-green btn-small" data-appt-done="${a.id}">Позначити виконано</button></div></div>`}).join('')}</section>`:''}
   <section class="card"><div class="actions" style="justify-content:space-between;align-items:flex-end"><div class="grid3" style="flex:1;max-width:${isMgr?'760px':'520px'}"><div><div class="field-label">Дата</div><input id="cabinetDate" type="date" value="${esc(date)}"></div>${isMgr?`<div><div class="field-label">Лікар</div><select id="cabinetDoctor">${docs.map(d=>`<option value="${d.id}" ${String(d.id)===String(did)?'selected':''}>${esc(d.name)} — ${esc(d.spec)}</option>`).join('')}</select></div>`:''}<div><div class="field-label">Робочий час</div><div class="muted" style="padding:10px 0;font-size:13px">${cfg.enabled?`${cfg.start}–${cfg.end}, слот ${cfg.slot||30} хв`:'Вихідний'}</div></div></div>${isMgr?`<button class="btn btn-secondary" id="btnGoScheduleSettings">Налаштувати графік</button>`:''}</div><div class="week-tabs info-week">${wdates.map(d=>{let cfgD=getDayConfig(did,d), meta=daySummaryLabel(did,d);let cls=`info-day ${d===date?'active':''} ${d===isoToday()?'today':''} ${String(d)<isoToday()?'past-day':''} ${!cfgD.enabled?'off-day':''}`;return `<button class="week-tab ${cls}" data-cabinet-day="${d}"><span class="day-main">${dayShort(d)}</span><span class="day-date">${fmtDob(d).slice(0,5)}</span><span class="day-meta">${meta}</span></button>`}).join('')}</div>${managerSummary}</section>
-  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||'', past=isPastSlot(date,sl.end), doneAllowed=hasConsultationForAppointment(a), canMoveHere=!!mv&&!a&&!past;return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-id="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:''}<div class="schedule-note">${esc(a.note||a.noShowReason||'')}</div></div><div class="schedule-actions"><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${isMgr?`<button class="btn btn-secondary btn-small" data-edit-appt="${a.id}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Змінити</button><button class="btn btn-secondary btn-small" data-move-appt="${a.id}">Перенести</button>`:''}${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:''}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Не було</button>`:''}</div>`:`<div class="schedule-free">Вільно</div>`}${isMgr&&!a?`${past?`<span class="muted" style="font-size:12px">минулий час</span>`:canMoveHere?`<button class="btn btn-green btn-small" data-move-here data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Сюди</button>`:`<button class="btn btn-secondary btn-small" data-edit-appt="" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Записати</button>`}`:''}</div>`}).join('')})()}</div>`}</section>`;
+  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||'', past=isSlotClosedForBooking(date,sl.time), doneAllowed=hasConsultationForAppointment(a), canMoveHere=!!mv&&!a&&!past;return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-id="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:''}<div class="schedule-note">${esc(a.note||a.noShowReason||'')}</div></div><div class="schedule-actions"><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${isMgr?`<button class="btn btn-secondary btn-small" data-edit-appt="${a.id}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Змінити</button><button class="btn btn-secondary btn-small" data-move-appt="${a.id}">Перенести</button>`:''}${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:''}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Не було</button>`:''}</div>`:`<div class="schedule-free">Вільно</div>`}${isMgr&&!a?`${past?`<span class="muted" style="font-size:12px">минулий час</span>`:canMoveHere?`<button class="btn btn-green btn-small" data-move-here data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Сюди</button>`:`<button class="btn btn-secondary btn-small" data-edit-appt="" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Записати</button>`}`:''}</div>`}).join('')})()}</div>`}</section>`;
 };
 
 /* Patient card: add no-show / cancellation events */
@@ -1395,7 +1395,7 @@ cabinetPage=function(){
   ${mv?`<section class="card" style="border-color:#f0a640;background:#fff9ec"><div class="card-title">Перенесення запису</div><div class="muted" style="font-size:13px;margin-bottom:8px">Оберіть вільний слот і натисніть <b>Сюди</b>. Переноситься: ${esc(patientShortName(patients.find(p=>String(p.id)===String(mv.patientId))))} · ${fmtDob(mv.date)} ${esc(mv.time||'')}</div><button class="btn btn-secondary btn-small" data-cancel-move-appt>Скасувати перенесення</button></section>`:''}
   ${!isMgr&&needDone.length?`<section class="card"><div class="card-title">Потрібно відмітити виконання</div>${needDone.map(a=>{let p=patients.find(x=>String(x.id)===String(a.patientId));return `<div class="notice-box">ℹ️ Консультація збережена, але запис ще не позначений як <b>Виконано</b>: ${esc(patientShortName(p))} · ${esc(a.time||'')}<div class="actions" style="margin-top:8px"><button class="btn btn-green btn-small" data-appt-done="${a.id}">Позначити виконано</button></div></div>`}).join('')}</section>`:''}
   <section class="card"><div class="actions" style="justify-content:space-between;align-items:flex-end"><div class="grid3" style="flex:1;max-width:${isMgr?'760px':'520px'}"><div><div class="field-label">Дата</div><input id="cabinetDate" type="date" value="${esc(date)}"></div>${isMgr?`<div><div class="field-label">Лікар</div><select id="cabinetDoctor">${docs.map(d=>`<option value="${d.id}" ${String(d.id)===String(did)?'selected':''}>${esc(d.name)} — ${esc(d.spec)}</option>`).join('')}</select></div>`:''}<div><div class="field-label">Робочий час</div><div class="muted" style="padding:10px 0;font-size:13px">${cfg.enabled?`${cfg.start}–${cfg.end}, слот ${cfg.slot||30} хв`:'Вихідний'}</div></div></div>${isMgr?`<button class="btn btn-secondary" id="btnGoScheduleSettings">Налаштувати графік</button>`:''}</div><div class="week-tabs info-week">${wdates.map(d=>{let cfgD=getDayConfig(did,d), meta=daySummaryLabel(did,d);let cls=`info-day ${d===date?'active':''} ${d===isoToday()?'today':''} ${String(d)<isoToday()?'past-day':''} ${!cfgD.enabled?'off-day':''}`;return `<button class="week-tab ${cls}" data-cabinet-day="${d}"><span class="day-main">${dayShort(d)}</span><span class="day-date">${fmtDob(d).slice(0,5)}</span><span class="day-meta">${meta}</span></button>`}).join('')}</div></section>
-  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||'', past=isPastSlot(date,sl.end), doneAllowed=hasConsultationForAppointment(a), canMoveHere=!!mv&&!a&&!past;return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-id="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:''}<div class="schedule-note">${esc(a.note||a.noShowReason||'')}</div>${appointmentConsultNotice(a,past)}</div><div class="schedule-actions"><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${isMgr?`<button class="btn btn-secondary btn-small" data-edit-appt="${a.id}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Змінити</button><button class="btn btn-secondary btn-small" data-move-appt="${a.id}">Перенести</button>`:''}${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта в межах запису або прив’яжіть через менеджера"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:''}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Не було</button>`:''}</div>`:`<div class="schedule-free">Вільно</div>`}${isMgr&&!a?`${past?`<span class="muted" style="font-size:12px">минулий час</span>`:canMoveHere?`<button class="btn btn-green btn-small" data-move-here data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Сюди</button>`:`<button class="btn btn-secondary btn-small" data-edit-appt="" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Записати</button>`}`:''}</div>`}).join('')})()}</div>`}</section>`;
+  <section class="card"><div class="card-title">Записи</div>${!slots.length?`<div class="empty">На цей день робочий час не заданий або вихідний.</div>`:`<div class="schedule-grid">${(()=>{let nextId=nextAppointmentIdForDay(did,date);return slots.map(sl=>{let a=apptForSlot(did,date,sl.time),p=a?patients.find(x=>String(x.id)===String(a.patientId)):null, st=a?.status||'', past=isSlotClosedForBooking(date,sl.time), doneAllowed=hasConsultationForAppointment(a), canMoveHere=!!mv&&!a&&!past;return `<div class="schedule-slot ${a?'booked':'free'} ${st} ${past?'past':''} ${a&&String(a.id)===String(nextId)?'next':''}" data-appt-id="${a?a.id:''}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}" data-slot-past="${past?'1':'0'}"><div class="schedule-time">${sl.time} - ${sl.end}</div>${a?`<div class="schedule-patient">${esc(patientShortName(p))} ${st?`<span class="status-pill ${st}">${appointmentStatusText(a)}</span>`:''}<div class="schedule-note">${esc(a.note||a.noShowReason||'')}</div>${appointmentConsultNotice(a,past)}</div><div class="schedule-actions"><button class="btn btn-secondary btn-small" data-open-patient="${a.patientId}">Картка</button>${isMgr?`<button class="btn btn-secondary btn-small" data-edit-appt="${a.id}" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Змінити</button><button class="btn btn-secondary btn-small" data-move-appt="${a.id}">Перенести</button>`:''}${(!isMgr&&String(did)===String(state.doctor.id))?`<button class="btn btn-green btn-small" data-appt-done="${a.id}" ${(doneAllowed||st==='done')?'':'disabled title="Спочатку збережіть консультацію цього пацієнта в межах запису або прив’яжіть через менеджера"'}>${st==='done'?'Зняти виконано':'Виконано'}</button>${(!doneAllowed&&st!=='done')?`<span class="disabled-note">немає консультації</span>`:''}<button class="btn btn-danger btn-small" data-appt-cancel="${a.id}">Не було</button>`:''}</div>`:`<div class="schedule-free">Вільно</div>`}${isMgr&&!a?`${past?`<span class="muted" style="font-size:12px">минулий час</span>`:canMoveHere?`<button class="btn btn-green btn-small" data-move-here data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Сюди</button>`:`<button class="btn btn-secondary btn-small" data-edit-appt="" data-appt-slot="${sl.time}" data-appt-doctor="${did}" data-appt-date="${date}">Записати</button>`}`:''}</div>`}).join('')})()}</div>`}</section>`;
 };
 
 const __mfBind_v330=bind;
@@ -1486,7 +1486,7 @@ function createAppointmentFromConsultAlert(alertId){
   state.cabinetDate=isoToday();
   // open appointment modal for current nearest future/free slot today, or 09:00 if no schedule
   let slots=buildSlots(a.doctorId, state.cabinetDate);
-  let slot=(slots.find(sl=>!apptForSlot(a.doctorId,state.cabinetDate,sl.time)&&!isPastSlot(state.cabinetDate,sl.end))||slots[0]||{time:'09:00'}).time;
+  let slot=(slots.find(sl=>!apptForSlot(a.doctorId,state.cabinetDate,sl.time)&&!isSlotClosedForBooking(state.cabinetDate,sl.time))||slots[0]||{time:'09:00'}).time;
   state.modal='appointment';
   state.modalData={doctorId:a.doctorId,date:state.cabinetDate,time:slot,patientId:a.patientId,linkConsultationId:a.consultationId,alertId:a.id};
   r();
@@ -1657,7 +1657,7 @@ function createAppointmentDirectForConsult(consultId){
   state.cabinetDoctorId=String(c.doctorId||state.cabinetDoctorId||state.doctor.id);
   state.cabinetDate=c.date||isoToday();
   const slots=buildSlots(c.doctorId,state.cabinetDate);
-  const slot=(slots.find(sl=>!apptForSlot(c.doctorId,state.cabinetDate,sl.time)&&!isPastSlot(state.cabinetDate,sl.end))||slots[0]||{time:'09:00'}).time;
+  const slot=(slots.find(sl=>!apptForSlot(c.doctorId,state.cabinetDate,sl.time)&&!isSlotClosedForBooking(state.cabinetDate,sl.time))||slots[0]||{time:'09:00'}).time;
   state.modal='appointment';
   state.modalData={doctorId:c.doctorId,date:state.cabinetDate,time:slot,patientId:c.patientId,linkConsultationId:c.id};
   r();
@@ -2456,6 +2456,116 @@ mfEnsureSharedData=async function(){
     if(Object.keys(updates).length) await ref.update(updates);
   }
   mfApplyCloudData(normalized);
+};
+
+
+/* === v3.36 UX hotfixes ===
+   1) safe settings collapse keys (no Firebase-invalid characters like /)
+   2) booking buffer: cannot book if slot starts in <5 minutes
+   3) jump to schedule settings from cabinet
+   4) consultations sorted newest first
+   5) duplicate from consultation panel keeps selected patient
+*/
+function mfSafeKeyPart(text){
+  try{
+    return btoa(unescape(encodeURIComponent(String(text||'')))).replace(/[.#$\/[\]]/g,'_');
+  }catch(e){
+    return encodeURIComponent(String(text||'')).replace(/[.#$\/[\]%]/g,'_');
+  }
+}
+function mfCleanSettingsCollapsed(){
+  if(!settingsCollapsed || typeof settingsCollapsed !== 'object' || Array.isArray(settingsCollapsed)) settingsCollapsed={};
+  Object.keys(settingsCollapsed).forEach(k=>{ if(/[.#$\/[\]]/.test(k)) delete settingsCollapsed[k]; });
+}
+settingKey=function(title){return `u${state.doctor?.id||0}_${mfSafeKeyPart(String(title||'').trim())}`};
+isSettingCollapsed=function(title){mfCleanSettingsCollapsed();return !!settingsCollapsed[settingKey(title)]};
+toggleSetting=function(title){
+  mfCleanSettingsCollapsed();
+  const k=settingKey(title);
+  settingsCollapsed[k]=!settingsCollapsed[k];
+  save('mf_settings_collapsed',settingsCollapsed);
+  r();
+};
+enhanceSettingsToggles=function(){
+  if(state.page!=='settings')return;
+  document.querySelectorAll('.main-content > .card').forEach(card=>{
+    if(card.dataset.toggleReady==='1')return;
+    const title=card.querySelector(':scope > .card-title');
+    if(!title)return;
+    const t=title.textContent.trim();
+    const head=document.createElement('div');
+    head.className='setting-head';
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='setting-toggle';
+    btn.textContent=isSettingCollapsed(t)?'Розгорнути':'Згорнути';
+    title.parentNode.insertBefore(head,title);
+    head.appendChild(title);
+    head.appendChild(btn);
+    const body=document.createElement('div');
+    body.className='setting-body'+(isSettingCollapsed(t)?' collapsed':'');
+    while(head.nextSibling) body.appendChild(head.nextSibling);
+    card.appendChild(body);
+    const doToggle=(e)=>{e.preventDefault();e.stopPropagation();toggleSetting(t)};
+    btn.addEventListener('click',doToggle);
+    title.style.cursor='pointer';
+    title.addEventListener('click',doToggle);
+    card.dataset.toggleReady='1';
+  });
+};
+
+function isSlotClosedForBooking(date,startTime){
+  const start=new Date(String(date)+'T'+String(startTime||'00:00')+':00');
+  return start.getTime() - Date.now() < 5*60*1000;
+}
+
+patientConsults=function(pid){
+  return consultations
+    .filter(c=>String(c.patientId)===String(pid)&&canViewConsultation(c))
+    .sort((a,b)=>{
+      const bd=String(b.date||'');
+      const ad=String(a.date||'');
+      if(bd!==ad) return bd.localeCompare(ad);
+      return String(b.createdAt||b.updatedAt||'').localeCompare(String(a.createdAt||a.updatedAt||''));
+    });
+};
+
+const __r_v336=r;
+r=function(){
+  __r_v336();
+  if(state.scrollToSettingsSection){
+    const targetTitle=state.scrollToSettingsSection;
+    state.scrollToSettingsSection=null;
+    setTimeout(()=>{
+      const titles=[...document.querySelectorAll('.main-content .setting-head .card-title, .main-content > .card > .card-title')];
+      const el=titles.find(x=>x.textContent.trim().includes(targetTitle));
+      const card=el?.closest('.card');
+      if(card){
+        card.scrollIntoView({behavior:'smooth',block:'start'});
+        card.style.boxShadow='0 0 0 3px rgba(29,158,117,.18)';
+        setTimeout(()=>{card.style.boxShadow=''},1200);
+      }
+    },80);
+  }
+};
+
+const __bind_v336=bind;
+bind=function(){
+  __bind_v336();
+  const go=document.getElementById('btnGoScheduleSettings');
+  if(go)go.onclick=()=>{
+    state.scheduleDoctorId=state.cabinetDoctorId;
+    state.page='settings';
+    state.scrollToSettingsSection='Графік роботи лікарів';
+    r();
+  };
+  document.querySelectorAll('[data-duplicate-consult]').forEach(el=>{
+    el.onclick=()=>{
+      const keep=el.dataset.duplicateKeepPatient==='1' || (state.page==='form' && !!state.selectedPatient);
+      if(typeof duplicateConsultationToForm==='function') duplicateConsultationToForm(el.dataset.duplicateConsult,keep);
+      else duplicateConsultation(el.dataset.duplicateConsult);
+    };
+  });
 };
 
 
